@@ -19,7 +19,7 @@
             <v-text-field
               v-model="startTime"
               label="start time in second"
-              hint="2:00, 12:00"
+              :hint="timeHint"
               persistent-hint
               outlined
             >
@@ -29,14 +29,14 @@
             <v-text-field
               v-model="endTime"
               label="end time in second"
-              hint="2:00, 12:00"
+              :hint="timeHint"
               persistent-hint
               outlined
             >
             </v-text-field>
           </v-col>
           <v-col cols="12" class="d-flex justify-center">
-            <v-btn color="primary" @click="instantiatePlayer">Lezgo</v-btn>
+            <v-btn color="primary" @click="onButtonClicked">Lezgo</v-btn>
           </v-col>
         </v-row>
       </v-container>
@@ -55,7 +55,8 @@ export default {
     isFirstTime: true,
     player: null,
     ytUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    startTime: "1:00",
+    timeHint: "1:00, 12:00, 1:02:03",
+    startTime: "0:00",
     endTime: "2:00",
     playerOptions: {
       width: "500px",
@@ -63,16 +64,19 @@ export default {
       techOrder: ["youtube"],
       sources: [],
     },
+    cacheYtUrlKey: "ytUrl",
+    cacheStartKey: "start",
+    cacheEndKey: "end",
   }),
 
   computed: {
     startTimeInSecond() {
-      let split = this.startTime.split(":");
-      return parseInt(split[0]) * 60 + parseInt(split[1]);
+      console.log("start", this.calculateSeconds(this.startTime));
+      return this.calculateSeconds(this.startTime);
     },
     endTimeInSecond() {
-      let split = this.endTime.split(":");
-      return parseInt(split[0]) * 60 + parseInt(split[1]);
+      console.log("end", this.calculateSeconds(this.endTime));
+      return this.calculateSeconds(this.endTime);
     },
   },
 
@@ -84,11 +88,45 @@ export default {
         this.rewind();
       }
     },
+    calculateSeconds(input) {
+      let split = input.split(":");
+      let timeInSecond = 0;
+      if (split.length == 2) {
+        split.forEach((item, index) => {
+          if (index == 0) {
+            timeInSecond += parseInt(item) * 60;
+          } else {
+            timeInSecond += parseInt(item);
+          }
+        });
+      } else {
+        split.forEach((item, index) => {
+          if (index == 0) {
+            timeInSecond += parseInt(item) * 3600;
+          } else if (index == 1) {
+            timeInSecond += parseInt(item) * 60;
+          } else {
+            timeInSecond += parseInt(item);
+          }
+        });
+      }
+
+      return timeInSecond;
+    },
     rewind() {
       if (this.isFirstTime) {
         this.isFirstTime = false;
         this.player.currentTime(this.startTimeInSecond);
       }
+    },
+    onButtonClicked() {
+      this.cacheInputs();
+      this.instantiatePlayer();
+    },
+    cacheInputs() {
+      localStorage.setItem(this.cacheYtUrlKey, this.ytUrl);
+      localStorage.setItem(this.cacheStartKey, this.startTime);
+      localStorage.setItem(this.cacheEndKey, this.endTime);
     },
     instantiatePlayer() {
       this.disposePlayerIfExists();
@@ -107,11 +145,22 @@ export default {
         this.player.play();
       });
     },
+    populateCacheIfExists() {
+      if (localStorage.getItem(this.cacheYtUrlKey)) {
+        this.ytUrl = localStorage.getItem(this.cacheYtUrlKey);
+        this.startTime = localStorage.getItem(this.cacheStartKey);
+        this.endTime = localStorage.getItem(this.cacheEndKey);
+      }
+    },
     disposePlayerIfExists() {
       if (this.player) {
         this.player.dispose();
       }
     },
+  },
+
+  mounted() {
+    this.populateCacheIfExists();
   },
 
   beforeDestroy() {
