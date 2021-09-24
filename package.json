@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "core-js": "^3.6.5",
-    "video.js": "^7.11.2",
+    "video.js": "^7.15.6",
     "videojs-youtube": "^2.6.1",
     "vue": "^2.6.11",
     "vuetify": "^2.4.0"
