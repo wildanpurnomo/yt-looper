@@ -9,9 +9,9 @@
   },
   "dependencies": {
     "core-js": "^3.6.5",
+    "video.js": "^7.11.2",
     "videojs-youtube": "^2.6.1",
     "vue": "^2.6.11",
-    "vue-video-player": "^5.0.2",
     "vuetify": "^2.4.0"
   },
   "devDependencies": {
