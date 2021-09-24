@@ -19,7 +19,7 @@
             <v-text-field
               v-model="startTime"
               label="start time in second"
-              hint="120 for 2:00"
+              hint="2:00, 12:00"
               persistent-hint
               outlined
             >
@@ -29,7 +29,7 @@
             <v-text-field
               v-model="endTime"
               label="end time in second"
-              hint="120 for 2:00"
+              hint="2:00, 12:00"
               persistent-hint
               outlined
             >
@@ -55,8 +55,8 @@ export default {
     isFirstTime: true,
     player: null,
     ytUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    startTime: 30,
-    endTime: 40,
+    startTime: "1:00",
+    endTime: "2:00",
     playerOptions: {
       width: "500px",
       height: "300px",
@@ -65,10 +65,21 @@ export default {
     },
   }),
 
+  computed: {
+    startTimeInSecond() {
+      let split = this.startTime.split(":");
+      return parseInt(split[0]) * 60 + parseInt(split[1]);
+    },
+    endTimeInSecond() {
+      let split = this.endTime.split(":");
+      return parseInt(split[0]) * 60 + parseInt(split[1]);
+    },
+  },
+
   methods: {
     onVideoTimeUpdate() {
       //console.log(`${player.cache_.currentTime} / ${player.cache_.duration}`);
-      if (this.player.cache_.currentTime >= this.endTime) {
+      if (this.player.cache_.currentTime >= this.endTimeInSecond) {
         this.isFirstTime = true;
         this.rewind();
       }
@@ -76,7 +87,7 @@ export default {
     rewind() {
       if (this.isFirstTime) {
         this.isFirstTime = false;
-        this.player.currentTime(this.startTime);
+        this.player.currentTime(this.startTimeInSecond);
       }
     },
     instantiatePlayer() {
