@@ -3,8 +3,13 @@
     <v-main>
       <v-container fill-height>
         <v-row align="center">
-          <v-col cols="12" class="d-flex justify-center">
-            <video controls ref="videoPlayer" class="video-js" />
+          <v-col id="videoPlayerParent" cols="12" class="d-flex justify-center">
+            <video
+              id="videoPlayer"
+              controls
+              ref="videoPlayer"
+              class="video-js"
+            />
           </v-col>
           <v-col cols="4">
             <v-text-field
@@ -36,7 +41,21 @@
             </v-text-field>
           </v-col>
           <v-col cols="12" class="d-flex justify-center">
-            <v-btn color="primary" @click="onButtonClicked">Lezgo</v-btn>
+            <v-btn color="primary" @click="initiatePlayLoop">Lezgo</v-btn>
+          </v-col>
+          <v-col cols="12">
+            <h3>Last played</h3>
+          </v-col>
+          <v-col
+            cols="4"
+            v-for="(item, index) in dummyHistories"
+            :key="index"
+            style="cursor: pointer"
+            @click="onHistoryItemClicked(item)"
+          >
+            <v-card>
+              <v-img max-height="200" :src="item.thumbnail"></v-img>
+            </v-card>
           </v-col>
         </v-row>
       </v-container>
@@ -48,6 +67,7 @@
 import "videojs-youtube";
 import "video.js/dist/video-js.css";
 import videojs from "video.js";
+import HistoryModel from "@/models/history.model";
 export default {
   name: "App",
 
@@ -59,6 +79,7 @@ export default {
     startTime: "0:00",
     endTime: "2:00",
     playerOptions: {
+      muted: true,
       width: "500px",
       height: "300px",
       techOrder: ["youtube"],
@@ -67,16 +88,37 @@ export default {
     cacheYtUrlKey: "ytUrl",
     cacheStartKey: "start",
     cacheEndKey: "end",
+    cacheLastPlayedKey: "lastPlayed",
+    dummyHistories: [
+      new HistoryModel(
+        "https://img.youtube.com/vi/dQw4w9WgXcQ/0.jpg",
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "1:00",
+        "1:10"
+      ),
+      new HistoryModel(
+        "https://img.youtube.com/vi/mP0Ej28JeCs/0.jpg",
+        "https://www.youtube.com/watch?v=mP0Ej28JeCs",
+        "2:00",
+        "2:10"
+      ),
+    ],
   }),
 
   computed: {
+    videoPlayerParent() {
+      return document.getElementById("videoPlayerParent");
+    },
     startTimeInSecond() {
-      console.log("start", this.calculateSeconds(this.startTime));
       return this.calculateSeconds(this.startTime);
     },
     endTimeInSecond() {
-      console.log("end", this.calculateSeconds(this.endTime));
       return this.calculateSeconds(this.endTime);
+    },
+    lastPlayedClips() {
+      return localStorage.getItem(this.lastPlayedClips)
+        ? localStorage.getItem(this.lastPlayedClips)
+        : [];
     },
   },
 
@@ -119,8 +161,20 @@ export default {
         this.player.currentTime(this.startTimeInSecond);
       }
     },
-    onButtonClicked() {
+    initiatePlayLoop() {
+      this.disposePlayerIfExists();
       this.cacheInputs();
+      this.instantiatePlayer();
+    },
+    onHistoryItemClicked(historyModel) {
+      this.ytUrl = historyModel.ytUrl;
+      this.startTime = historyModel.startTime;
+      this.endTime = historyModel.endTime;
+      this.isFirstTime = true;
+
+      this.cacheInputs();
+      this.disposePlayerIfExists();
+      this.recreateVideoPlayer();
       this.instantiatePlayer();
     },
     cacheInputs() {
@@ -129,7 +183,6 @@ export default {
       localStorage.setItem(this.cacheEndKey, this.endTime);
     },
     instantiatePlayer() {
-      this.disposePlayerIfExists();
       this.$set(
         (this.playerOptions.sources = [
           {
@@ -138,7 +191,10 @@ export default {
           },
         ])
       );
-      this.player = videojs(this.$refs.videoPlayer, this.playerOptions);
+      this.player = videojs(
+        document.getElementById("videoPlayer"),
+        this.playerOptions
+      );
       this.player.on("timeupdate", this.onVideoTimeUpdate);
       this.player.on("play", this.rewind);
       this.player.on("ready", () => {
@@ -153,9 +209,18 @@ export default {
       }
     },
     disposePlayerIfExists() {
-      if (this.player) {
+      if (this.player != null) {
         this.player.dispose();
+        this.player = null;
       }
+    },
+    recreateVideoPlayer() {
+      let video = document.createElement("video");
+      video.ref = "videoPlayer";
+      video.controls = true;
+      video.id = "videoPlayer";
+      video.className = "video-js";
+      this.videoPlayerParent.appendChild(video);
     },
   },
 
