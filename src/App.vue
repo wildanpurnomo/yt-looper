@@ -4,12 +4,6 @@
       <v-container fill-height>
         <v-row align="center">
           <v-col id="videoPlayerParent" cols="12" class="d-flex justify-center">
-            <video
-              id="videoPlayer"
-              controls
-              ref="videoPlayer"
-              class="video-js"
-            />
           </v-col>
           <v-col cols="4">
             <v-text-field
@@ -41,20 +35,23 @@
             </v-text-field>
           </v-col>
           <v-col cols="12" class="d-flex justify-center">
-            <v-btn color="primary" @click="initiatePlayLoop">Lezgo</v-btn>
+            <v-btn color="primary" @click="initiatePlayLoop">Lesgo</v-btn>
+          </v-col>
+          <v-col cols="12">
+            <h3>Timestamps</h3>
           </v-col>
           <v-col cols="12">
             <h3>Last played</h3>
           </v-col>
           <v-col
             cols="4"
-            v-for="(item, index) in dummyHistories"
+            v-for="(item, index) in clipHistories ? clipHistories : []"
             :key="index"
             style="cursor: pointer"
-            @click="onHistoryItemClicked(item)"
+            @click="onHistoryItemClicked(item, index)"
           >
             <v-card>
-              <v-img max-height="200" :src="item.thumbnail"></v-img>
+              <v-img max-height="200" :src="getThumbnail(item.ytUrl)"></v-img>
             </v-card>
           </v-col>
         </v-row>
@@ -74,35 +71,20 @@ export default {
   data: () => ({
     isFirstTime: true,
     player: null,
+    ytUrlRegex:
+      /(?:youtube(?:-nocookie)?\.com\/(?:[^\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
     ytUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
     timeHint: "1:00, 12:00, 1:02:03",
     startTime: "0:00",
     endTime: "2:00",
     playerOptions: {
-      muted: true,
       width: "500px",
       height: "300px",
       techOrder: ["youtube"],
       sources: [],
     },
-    cacheYtUrlKey: "ytUrl",
-    cacheStartKey: "start",
-    cacheEndKey: "end",
-    cacheLastPlayedKey: "lastPlayed",
-    dummyHistories: [
-      new HistoryModel(
-        "https://img.youtube.com/vi/dQw4w9WgXcQ/0.jpg",
-        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-        "1:00",
-        "1:10"
-      ),
-      new HistoryModel(
-        "https://img.youtube.com/vi/mP0Ej28JeCs/0.jpg",
-        "https://www.youtube.com/watch?v=mP0Ej28JeCs",
-        "2:00",
-        "2:10"
-      ),
-    ],
+    clipHistoryKey: "history",
+    lastPlayedClipIndexKey: "lastPlayedIndex",
   }),
 
   computed: {
@@ -115,10 +97,15 @@ export default {
     endTimeInSecond() {
       return this.calculateSeconds(this.endTime);
     },
-    lastPlayedClips() {
-      return localStorage.getItem(this.lastPlayedClips)
-        ? localStorage.getItem(this.lastPlayedClips)
+    clipHistories() {
+      return localStorage.getItem(this.clipHistoryKey)
+        ? JSON.parse(localStorage.getItem(this.clipHistoryKey))
         : [];
+    },
+    lastPlayedClipIndex() {
+      return localStorage.getItem(this.lastPlayedClipIndexKey)
+        ? parseInt(localStorage.getItem(this.lastPlayedClipIndexKey))
+        : 0;
     },
   },
 
@@ -162,25 +149,43 @@ export default {
       }
     },
     initiatePlayLoop() {
+      this.isFirstTime = true;
       this.disposePlayerIfExists();
       this.cacheInputs();
+      this.createVideoPlayerElement();
       this.instantiatePlayer();
     },
-    onHistoryItemClicked(historyModel) {
+    onHistoryItemClicked(historyModel, itemIndex) {
+      localStorage.setItem(this.lastPlayedClipIndexKey, itemIndex.toString());
       this.ytUrl = historyModel.ytUrl;
       this.startTime = historyModel.startTime;
       this.endTime = historyModel.endTime;
-      this.isFirstTime = true;
 
-      this.cacheInputs();
-      this.disposePlayerIfExists();
-      this.recreateVideoPlayer();
-      this.instantiatePlayer();
+      this.initiatePlayLoop();
     },
     cacheInputs() {
-      localStorage.setItem(this.cacheYtUrlKey, this.ytUrl);
-      localStorage.setItem(this.cacheStartKey, this.startTime);
-      localStorage.setItem(this.cacheEndKey, this.endTime);
+      if (this.isClipHistoryNotEmpty()) {
+        if (this.isNewClip()) {
+          this.appendClipToHistory();
+        }
+      } else {
+        this.setNewClipHistory();
+      }
+    },
+    appendClipToHistory() {
+      let stored = this.clipHistories.slice();
+      stored.unshift(
+        new HistoryModel(this.ytUrl, this.startTime, this.endTime)
+      );
+      localStorage.setItem(this.clipHistoryKey, JSON.stringify(stored));
+    },
+    setNewClipHistory() {
+      localStorage.setItem(
+        this.clipHistoryKey,
+        JSON.stringify([
+          new HistoryModel(this.ytUrl, this.startTime, this.endTime),
+        ])
+      );
     },
     instantiatePlayer() {
       this.$set(
@@ -202,10 +207,10 @@ export default {
       });
     },
     populateCacheIfExists() {
-      if (localStorage.getItem(this.cacheYtUrlKey)) {
-        this.ytUrl = localStorage.getItem(this.cacheYtUrlKey);
-        this.startTime = localStorage.getItem(this.cacheStartKey);
-        this.endTime = localStorage.getItem(this.cacheEndKey);
+      if (this.isClipHistoryNotEmpty()) {
+        this.ytUrl = this.clipHistories[this.lastPlayedClipIndex].ytUrl;
+        this.startTime = this.clipHistories[this.lastPlayedClipIndex].startTime;
+        this.endTime = this.clipHistories[this.lastPlayedClipIndex].endTime;
       }
     },
     disposePlayerIfExists() {
@@ -214,13 +219,27 @@ export default {
         this.player = null;
       }
     },
-    recreateVideoPlayer() {
+    createVideoPlayerElement() {
       let video = document.createElement("video");
       video.ref = "videoPlayer";
       video.controls = true;
       video.id = "videoPlayer";
       video.className = "video-js";
       this.videoPlayerParent.appendChild(video);
+    },
+    getThumbnail(ytUrl) {
+      return `https://img.youtube.com/vi/${
+        ytUrl.match(this.ytUrlRegex)[1]
+      }/0.jpg`;
+    },
+    isNewClip() {
+      let copyOfHistory = this.clipHistories.slice();
+      return (
+        copyOfHistory.filter((item) => item.ytUrl == this.ytUrl).length == 0
+      );
+    },
+    isClipHistoryNotEmpty() {
+      return this.clipHistories.length > 0;
     },
   },
 
